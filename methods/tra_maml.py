@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 
 class TRA_MAML(MetaTemplate):
-    def __init__(self, model_func,  n_way, n_support, task_update_num_initial = None, task_update_num_final = None, width = None, test_mode = False, approx = False):
+    def __init__(self, model_func,  n_way, n_support, min_step = None, max_step = None, width = None, test_mode = False, approx = False):
         super(TRA_MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.loss_fn = nn.CrossEntropyLoss()
@@ -27,12 +27,12 @@ class TRA_MAML(MetaTemplate):
         self.inner_loop_steps_list  = []  
 
         # annealing parameters
-        print(f'TRA_MAML config: {task_update_num_initial}-{task_update_num_final}-{width}\n')
+        print(f'TRA_MAML config: {min_step}-{max_step}-{width}\n')
         self.width = width  
-        self.task_update_num_initial = task_update_num_initial
-        self.task_update_num_final = task_update_num_final
+        self.min_step = min_step
+        self.max_step = max_step
         self.current_epoch = 0
-        self.last_task_update_num = self.task_update_num_initial
+        self.last_task_update_num = self.max_step
 
         self.test_mode = test_mode
       
@@ -41,8 +41,8 @@ class TRA_MAML(MetaTemplate):
         scores  = self.classifier.forward(out)
         return scores
 
-    def annealing_func(self, task_update_num_final, task_update_num_initial, width, current_epoch):
-      return tra(total_epochs = 200, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = width)
+    def annealing_func(self, min_step, max_step, width, current_epoch):
+      return tra(total_epochs = 200, current_epoch = current_epoch, max_step = max_step, min_step = min_step, max_step_width = width)
 
 
     def set_epoch(self, epoch):
@@ -64,10 +64,10 @@ class TRA_MAML(MetaTemplate):
 
         # do not anneal the inner steps in meta testing
         if self.test_mode:
-            self.task_update_num = self.task_update_num_initial
+            self.task_update_num = self.max_step # use full GD steps for testing
         else:
             # Calculate task_update_num based on current epoch
-            self.task_update_num = self.annealing_func(self.task_update_num_final, self.task_update_num_initial, self.width, self.current_epoch)
+            self.task_update_num = self.annealing_func(self.min_step, self.max_step, self.width, self.current_epoch)
 
         # Print task_update_num if it has changed
         if self.task_update_num != int(self.last_task_update_num):
