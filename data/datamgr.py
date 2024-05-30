@@ -4,7 +4,6 @@ import torch
 from PIL import Image
 import numpy as np
 import torchvision.transforms as transforms
-from torchvision.transforms import AutoAugment, AutoAugmentPolicy, InterpolationMode, RandAugment, AugMix
 import data.additional_transforms as add_transforms
 from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler
 from abc import abstractmethod
@@ -38,7 +37,7 @@ class TransformLoader:
         else:
             return method()
 
-    def get_composed_transform(self, aug=None, sn=False):
+    def get_composed_transform(self, aug=None):
         if aug == 'standard':
             transform_list = ['RandomResizedCrop', 'ImageJitter', 'RandomVerticalFlip', 'RandomHorizontalFlip', 'ToTensor', 'Normalize']
         elif aug == 'none':
@@ -54,7 +53,7 @@ class TransformLoader:
 
 class DataManager:
     @abstractmethod
-    def get_data_loader(self, data_file, aug, sn):
+    def get_data_loader(self, data_file, aug):
         pass 
 
 
