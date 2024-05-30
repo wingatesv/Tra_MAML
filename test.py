@@ -139,8 +139,7 @@ if __name__ == '__main__':
         if modelfile is not None:
             tmp = torch.load(modelfile)
             model.load_state_dict(tmp['state'])
-            if hasattr(model, 'task_lr'):
-                model.task_lr = tmp['task_lr']
+            
 
     split = params.split
     if params.save_iter != -1:
