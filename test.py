@@ -123,8 +123,8 @@ if __name__ == '__main__':
         
     if params.train_aug:
         checkpoint_dir += f'_{params.train_aug}'
-    if params.anneal_param != 'none':
-        checkpoint_dir += f'_{params.anneal_param}'
+    if params.tra != 'none':
+        checkpoint_dir += f'_{params.tra}'
 
 
     if not params.method in ['baseline', 'baseline++'] :
