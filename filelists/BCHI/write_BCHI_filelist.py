@@ -5,7 +5,7 @@ from os import listdir
 from os.path import isfile, join, isdir
 
 data_path = '/content/BCHI/BCHI Dataset ' 
-savedir = '/content/Dr_MAML/filelists/BCHI/'
+savedir = '/content/Tra_MAML/filelists/BCHI/'
 dataset_list = ['novel']
 
 folder_list = [f for f in listdir(data_path) if isdir(join(data_path, f))]
