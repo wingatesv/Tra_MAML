@@ -87,7 +87,10 @@ if __name__ == '__main__':
     else:
         raise ValueError(f"Unsupported dataset: {params.dataset}")
 
-    checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
+    if params.dataset == 'cross_IDC':
+        checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, 'BreaKHis_40x', params.model, params.method)
+    else:
+      checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
 
     if params.train_aug :
         checkpoint_dir += f'_{params.train_aug}'
