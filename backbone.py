@@ -6,7 +6,6 @@ import torch.nn as nn
 import math
 import numpy as np
 import torch.nn.functional as F
-# from torch.nn.utils.weight_norm import WeightNorm
 from torch.nn.utils.parametrizations import weight_norm as WeightNorm
 
 import torchvision.models as models
@@ -339,74 +338,6 @@ class ResNet(nn.Module):
         return out
 
 
-class ResNet_ImageNet(nn.Module):
-  def __init__(self, flatten = True, model = 'resnet18', frozen = True, layers=6):
-
-    super(ResNet_ImageNet, self).__init__()
-    self.name = model
-    self.flatten = flatten
-    last_layer = -1 if flatten else -2
-
-    if self.name =='resnet18':
-      self.weights = models.ResNet18_Weights.IMAGENET1K_V1
-      self.final_feat_dim = 512 if flatten else [512, 7, 7] #self.feature_extractor.fc.in_features
-    elif self.name == 'resnet34':
-      self.weights = models.ResNet34_Weights.IMAGENET1K_V1
-      self.final_feat_dim = 512 if flatten else [512, 7, 7]
-    elif self.name == 'resnet50':
-      self.weights = models.ResNet50_Weights.IMAGENET1K_V1
-      self.final_feat_dim = 2048 if flatten else [2048, 7, 7]
-    elif self.name == 'resnet101':
-      self.weights = models.ResNet101_Weights.IMAGENET1K_V1
-      self.final_feat_dim = 2048 if flatten else [2048, 7, 7]
-
-
-    self.feature_extractor = models.__dict__[self.name](weights=self.weights)
-
-    self.feature_extractor = nn.Sequential(*list(self.feature_extractor.children())[:last_layer])
-
-    #  set backbone training to False
-    if frozen:
-      print(f'Using Frozen ImageNet pre-trained weights, with last {layers} unfrozen')
-      for param in self.feature_extractor.parameters():
-        param.requires_grad = False
-      self.unfreeze_layers(num_layers = layers)
-      self.check_requires_grad()
-      
-    
-    # if frozen:
-    #   print('Freezing ImageNet pre-trained weights in Block 1 to 6 only, Block 7 (Last block) requires grad: True')
-    #   for name, module in self.feature_extractor.named_children():
-    #       if name != '7':
-    #         for param in module.parameters():
-    #           param.requires_grad = False
-    #   self.check_requires_grad()
-
-
-  def unfreeze_layers(self, num_layers):
-        total_layers = len(list(self.feature_extractor.parameters()))
-        layers_to_unfreeze = total_layers - num_layers
-        count = 0
-
-        for module in self.feature_extractor.children():
-            for param in module.parameters():
-                if count >= layers_to_unfreeze:
-                    param.requires_grad = True
-                count += 1
-
-
-  def forward(self, x):
-    x = self.feature_extractor(x)
-    if self.flatten:
-      x = nn.functional.adaptive_avg_pool2d(x, output_size=(1,1))
-      x = x.view(x.size(0), -1)
-    return x
-  
-  def check_requires_grad(self):
-    for name, param in self.named_parameters():
-      if param.requires_grad:
-         print(f'Layer: {name}\tRequires Grad: {param.requires_grad}')
-
 
 
 
@@ -426,28 +357,16 @@ def Conv6NP():
 def ResNet10( flatten = True):
     return ResNet(SimpleBlock, [1,1,1,1],[64,128,256,512], flatten)
 
-def ResNet18( flatten = True, method=None):
-   if method == 'imaml_idcg':
-      return ResNet_ImageNet(flatten = True, model = 'resnet18', frozen=True, layers=6)
-   else:
-      return ResNet(SimpleBlock, [2,2,2,2],[64,128,256,512], flatten)
+def ResNet18( flatten = True):
+    return ResNet(SimpleBlock, [2,2,2,2],[64,128,256,512], flatten)
 
-def ResNet34( flatten = True, method=None):
-    if method == 'imaml_idcg':
-      return ResNet_ImageNet(flatten = True, model = 'resnet34', frozen=True, layers=6)
-    else:
-      return ResNet(SimpleBlock, [3,4,6,3],[64,128,256,512], flatten)
+def ResNet34( flatten = True):
+    return ResNet(SimpleBlock, [3,4,6,3],[64,128,256,512], flatten)
 
-def ResNet50( flatten = True, method=None):
-    if method == 'imaml_idcg':
-        return ResNet_ImageNet(flatten = True, model = 'resnet50', frozen=True, layers=6)
-    else:
-        return ResNet(BottleneckBlock, [3,4,6,3], [256,512,1024,2048], flatten)
+def ResNet50( flatten = True):
+    return ResNet(BottleneckBlock, [3,4,6,3], [256,512,1024,2048], flatten)
 
-def ResNet101( flatten = True, method=None):
-    if method == 'imaml_idcg':
-          return ResNet_ImageNet(flatten = True, model = 'resnet101', frozen=True, layers=6)
-    else:
-          return ResNet(BottleneckBlock, [3,4,23,3],[256,512,1024,2048], flatten)
+def ResNet101( flatten = True):
+    return ResNet(BottleneckBlock, [3,4,23,3],[256,512,1024,2048], flatten)
 
 
