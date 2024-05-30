@@ -44,10 +44,9 @@ def save_features(model, data_loader, outfile ):
 if __name__ == '__main__':
     mp.set_start_method('spawn')
     params = parse_args('save_features')
-    
-    print(f'Applying StainNet stain normalisation......') if params.sn else print()
 
-    assert params.method not in ['maml', 'maml_approx', 'anil', 'annemaml', 'tra_anil'], 'maml variants do not support save_feature and run'
+
+    assert params.method not in ['maml', 'maml_approx',  'tra_maml'], 'maml variants do not support save_feature and run'
 
     if 'Conv' in params.model:
       image_size = 84 
@@ -56,22 +55,8 @@ if __name__ == '__main__':
 
     split = params.split
           
-    if params.dataset == 'BreaKHis_4x':
-      if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
-      else:
-          loadfile  = configs.data_dir['BreaKHis_4x'] + split + '.json'
-    elif params.dataset == 'BreaKHis_10x':
-      if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-      else:
-          loadfile  = configs.data_dir['BreaKHis_10x'] + split + '.json'
-    elif params.dataset == 'BreaKHis_20x':
-      if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-      else:
-          loadfile  = configs.data_dir['BreaKHis_20x'] + split + '.json'
-    elif params.dataset == 'BreaKHis_40x':
+  
+    if params.dataset == 'BreaKHis_40x':
       if split == 'base':
           loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
       else:
@@ -89,49 +74,15 @@ if __name__ == '__main__':
       else:
           loadfile  = configs.data_dir['Smear'] + split + '.json'
 
-    # Different dataset split
-    elif params.dataset == 'BreaKHis_4x_2':
-      if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_4x'] + 'base_2.json' 
-      else:
-          loadfile  = configs.data_dir['BreaKHis_4x'] + split + '_2.json'
-    elif params.dataset == 'BreaKHis_10x_2':
-      if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_10x'] + 'base_2.json' 
-      else:
-          loadfile  = configs.data_dir['BreaKHis_10x'] + split + '_2.json'
-    elif params.dataset == 'BreaKHis_20x_2':
-      if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_20x'] + 'base_2.json' 
-      else:
-          loadfile  = configs.data_dir['BreaKHis_20x'] + split + '_2.json'
-    elif params.dataset == 'BreaKHis_40x_2':
-      if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
-      else:
-          loadfile  = configs.data_dir['BreaKHis_40x'] + split + '_2.json'
-
-    elif params.dataset == 'ISIC_2':
-      if split == 'base':
-          loadfile = configs.data_dir['ISIC'] + 'base_2.json' 
-      else:
-          loadfile  = configs.data_dir['ISIC'] + split + '_2.json'
-
-    elif params.dataset == 'Smear_2':
-      if split == 'base':
-          loadfile = configs.data_dir['Smear'] + 'base_2.json' 
-      else:
-          loadfile  = configs.data_dir['Smear'] + split + '_2.json'
-
+  
     elif params.dataset == 'cross_IDC':
       if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
+          loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
       elif split == 'val':
-           loadfile  = configs.data_dir['BreaKHis_40x'] + 'val_2.json'
+           loadfile  = configs.data_dir['BreaKHis_40x'] + 'val.json'
       else:
            loadfile  = configs.data_dir['BCHI'] + 'novel.json'
          
-
 
     else:
         raise ValueError(f"Unsupported dataset: {params.dataset}")
@@ -140,8 +91,7 @@ if __name__ == '__main__':
 
     if params.train_aug :
         checkpoint_dir += f'_{params.train_aug}'
-    if params.sn:
-        checkpoint_dir += '_stainnet'
+
         
     if not params.method in ['baseline', 'baseline++'] :
         checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
@@ -158,7 +108,7 @@ if __name__ == '__main__':
         outfile = os.path.join( checkpoint_dir.replace("checkpoints","features"), split + ".hdf5") 
 
     datamgr = SimpleDataManager(image_size, batch_size = 64)
-    data_loader = datamgr.get_data_loader(loadfile, aug = 'none', sn = params.sn)
+    data_loader = datamgr.get_data_loader(loadfile, aug = 'none')
 
     if params.method in ['relationnet', 'relationnet_softmax']:
         if params.model == 'Conv4': 
@@ -167,7 +117,7 @@ if __name__ == '__main__':
             model = backbone.Conv6NP()
         else:
             model = model_dict[params.model]( flatten = False )
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'imaml_idcg']: 
+    elif params.method in ['maml' , 'maml_approx', 'tra_maml']: 
        raise ValueError('MAML variants do not support save feature')
     else:
         model = model_dict[params.model]()
