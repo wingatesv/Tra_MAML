@@ -212,9 +212,9 @@ if __name__=='__main__':
             else:
                 raise ValueError('Unknown TRA configs')
             model = TRA_MAML(  model_dict[params.model], 
-                             task_update_num_initial = int(tra[0]), 
-                             task_update_num_final = int(tra[1]), 
-                             annealing_rate = float(tra[2]),
+                             min_step = int(tra[0]), 
+                             max_step = int(tra[1]), 
+                             width = float(tra[2]),
                              test_mode = False,
                              approx = False, 
                              **train_few_shot_params )
