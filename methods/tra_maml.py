@@ -9,8 +9,7 @@ import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
 from methods.trapezoidal_step_scheduler import tra
 from tqdm import tqdm
-import math
-import random
+
 
 
 class TRA_MAML(MetaTemplate):
@@ -28,7 +27,7 @@ class TRA_MAML(MetaTemplate):
         self.inner_loop_steps_list  = []  
 
         # annealing parameters
-        print(f'TRA_MAML config: {task_update_num_initial}-{task_update_num_final}-{annealing_rate}\n')
+        print(f'TRA_MAML config: {task_update_num_initial}-{task_update_num_final}-{width}\n')
         self.width = width  
         self.task_update_num_initial = task_update_num_initial
         self.task_update_num_final = task_update_num_final
@@ -43,15 +42,14 @@ class TRA_MAML(MetaTemplate):
         return scores
 
     def annealing_func(self, task_update_num_final, task_update_num_initial, width, current_epoch):
-      epochs = 200
-      return tra(total_epochs = epochs, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = width)
+      return tra(total_epochs = 200, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = width)
 
 
     def set_epoch(self, epoch):
         self.current_epoch = epoch
 
     def set_forward(self,x, is_feature = False):
-        assert is_feature == False, 'ANNEMAML do not support fixed feature' 
+        assert is_feature == False, 'TRA_MAML do not support fixed feature' 
         
         x = x.cuda()
         x_var = Variable(x)
@@ -122,7 +120,7 @@ class TRA_MAML(MetaTemplate):
         for i, (x,_) in enumerate(train_loader):
 
             self.n_query = x.size(1) - self.n_support
-            assert self.n_way  ==  x.size(0), "MAML do not support way change"
+            assert self.n_way  ==  x.size(0), "TRA_MAML do not support way change"
             
 
             loss = self.set_forward_loss(x)
@@ -131,7 +129,7 @@ class TRA_MAML(MetaTemplate):
 
             task_count += 1
 
-            if task_count == self.n_task: #MAML update several tasks at one time
+            if task_count == self.n_task: #TRA_MAML update several tasks at one time
        
                 loss_q = torch.stack(loss_all).sum(0)
                 loss_value = loss_q.item()
@@ -152,7 +150,7 @@ class TRA_MAML(MetaTemplate):
         acc_all = []
         
         iter_num = len(test_loader) 
-        # for i, (x,_) in enumerate(test_loader):
+
         for i, (x,_) in enumerate(tqdm(test_loader, desc='Testing', leave=False)):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way  ==  x.size(0), "MAML do not support way change"
