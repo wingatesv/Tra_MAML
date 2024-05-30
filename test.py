@@ -23,10 +23,8 @@ from methods.protonet import ProtoNet
 from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
-from methods.anil import ANIL
-from methods.anneal_maml import ANNEMAML
-from methods.tra_anil import TRA_ANIL
-from methods.xmaml import XMAML
+from methods.tra_maml import TRA_MAML
+
 
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file, set_seed
 
@@ -62,10 +60,8 @@ if __name__ == '__main__':
     if not os.path.exists(result_dir):
        os.makedirs(result_dir)
 
-    
 
     params = parse_args('test')
-    print(f'Applying StainNet stain normalization......') if params.sn else print()
 
     acc_all = []
     iter_num = 600
@@ -91,7 +87,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method == 'relationnet' else 'softmax'
         model           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil']:
+    elif params.method in ['maml' , 'maml_approx', 'tra_maml']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -100,51 +96,28 @@ if __name__ == '__main__':
 
       if params.method in ['maml', 'maml_approx']:
         model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') , **few_shot_params )
+
+      elif params.method == 'tra_maml':     
+        if params.tra != 'none':
+            tra = params.tra.split('-')
+        else:
+            raise ValueError('Unknown TRA configs')
+        model = TRA_MAML(  model_dict[params.model], 
+                         task_update_num_initial = int(tra[0]), 
+                         task_update_num_final = int(tra[1]), 
+                         width = float(tra[2]), 
+                         test_mode = True,
+                         approx = False , 
+                     **few_shot_params )
+
      
-      elif params.method == 'anil':
-        model = ANIL(  model_dict[params.model], approx = False , **few_shot_params )
-
-      elif params.method == 'annemaml':     
-        if params.anneal_param != 'none':
-            anneal_params = params.anneal_param.split('-')
-        else:
-            raise ValueError('Unknown Annealing Parameters')
-        model = ANNEMAML(  model_dict[params.model], 
-                         annealing_type = str(anneal_params[0]), 
-                         task_update_num_initial = int(anneal_params[1]), 
-                         task_update_num_final = int(anneal_params[2]), 
-                         annealing_rate = float(anneal_params[3]), 
-                         test_mode = True,
-                         approx = False , 
-                     **few_shot_params )
-
-      elif params.method == 'tra_anil':     
-        if params.anneal_param != 'none':
-            anneal_params = params.anneal_param.split('-')
-        else:
-            raise ValueError('Unknown Annealing Parameters')
-        model = TRA_ANIL(  model_dict[params.model], 
-                         annealing_type = str(anneal_params[0]), 
-                         task_update_num_initial = int(anneal_params[1]), 
-                         task_update_num_final = int(anneal_params[2]), 
-                         width = float(anneal_params[3]), 
-                         test_mode = True,
-                         approx = False , 
-                     **few_shot_params )
-
-      elif params.method == 'xmaml':     
-            model = XMAML(  model_dict[params.model], 
-                             test_mode = True,
-                             approx = False , 
-                         **few_shot_params )
-
     else:
        raise ValueError('Unknown method')
 
     model = model.cuda()
 
     if params.dataset == 'cross_IDC':
-        checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, 'BreaKHis_40x_2', params.model, params.method)
+        checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, 'BreaKHis_40x', params.model, params.method)
     else:
         checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
         
@@ -152,8 +125,7 @@ if __name__ == '__main__':
         checkpoint_dir += f'_{params.train_aug}'
     if params.anneal_param != 'none':
         checkpoint_dir += f'_{params.anneal_param}'
-    if params.sn:
-        checkpoint_dir += '_stainnet'
+
 
     if not params.method in ['baseline', 'baseline++'] :
         checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
@@ -175,7 +147,7 @@ if __name__ == '__main__':
         split_str = split + "_" +str(params.save_iter)
     else:
         split_str = split
-    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil']: #maml do not support testing with feature
+    if params.method in ['maml', 'maml_approx', 'tra_maml']: #maml do not support testing with feature
         if 'Conv' in params.model:
             image_size = 84 
   
@@ -186,22 +158,8 @@ if __name__ == '__main__':
         datamgr  = SetDataManager(image_size, n_eposide = iter_num, n_query = 15 , **few_shot_params)
 
 
-        if params.dataset == 'BreaKHis_4x':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['BreaKHis_4x'] + split + '.json'
-        elif params.dataset == 'BreaKHis_10x':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['BreaKHis_10x'] + split + '.json'
-        elif params.dataset == 'BreaKHis_20x':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['BreaKHis_20x'] + split + '.json'
-        elif params.dataset == 'BreaKHis_40x':
+      
+        if params.dataset == 'BreaKHis_40x':
           if split == 'base':
               loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
           else:
@@ -219,44 +177,12 @@ if __name__ == '__main__':
           else:
               loadfile  = configs.data_dir['Smear'] + split + '.json'
 
-        elif params.dataset == 'BreaKHis_4x_2':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_4x'] + 'base_2.json' 
-          else:
-              loadfile  = configs.data_dir['BreaKHis_4x'] + split + '_2.json'
-        elif params.dataset == 'BreaKHis_10x_2':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_10x'] + 'base_2.json' 
-          else:
-              loadfile  = configs.data_dir['BreaKHis_10x'] + split + '_2.json'
-        elif params.dataset == 'BreaKHis_20x_2':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_20x'] + 'base_2.json' 
-          else:
-              loadfile  = configs.data_dir['BreaKHis_20x'] + split + '_2.json'
-        elif params.dataset == 'BreaKHis_40x_2':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
-          else:
-              loadfile  = configs.data_dir['BreaKHis_40x'] + split + '_2.json'
-
-        elif params.dataset == 'ISIC_2':
-          if split == 'base':
-              loadfile = configs.data_dir['ISIC'] + 'base_2.json' 
-          else:
-              loadfile  = configs.data_dir['ISIC'] + split + '_2.json'
-
-        elif params.dataset == 'Smear_2':
-          if split == 'base':
-              loadfile = configs.data_dir['Smear'] + 'base_2.json' 
-          else:
-              loadfile  = configs.data_dir['Smear'] + split + '_2.json'
-
+      
         elif params.dataset == 'cross_IDC':
           if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
+              loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
           elif split == 'val':
-              loadfile  = configs.data_dir['BreaKHis_40x'] + 'val_2.json'
+              loadfile  = configs.data_dir['BreaKHis_40x'] + 'val.json'
           else:
               loadfile  = configs.data_dir['BCHI'] + 'novel.json'
 
@@ -265,7 +191,7 @@ if __name__ == '__main__':
             raise ValueError(f"Unsupported dataset: {params.dataset}")
            
 
-        novel_loader     = datamgr.get_data_loader( loadfile, aug = 'none', sn = params.sn)
+        novel_loader     = datamgr.get_data_loader( loadfile, aug = 'none')
 
         if params.adaptation:
             model.task_update_num = 100 #We perform adaptation on MAML simply by updating more times.
@@ -288,7 +214,7 @@ if __name__ == '__main__':
     with open(os.path.join(result_dir, 'results.txt') , 'a') as f:
         timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime()) 
         aug_str = f'-{params.train_aug}' if params.train_aug else '-none'
-        aug_str += f'-{params.anneal_param}' if params.anneal_param != 'none' else '-none'
+        aug_str += f'-{params.tra}' if params.tra != 'none' else '-none'
         if hasattr(model, 'experimental'):
             aug_str += f'-{model.experimental}'
         aug_str += '-adapted' if params.adaptation else ''
