@@ -3,7 +3,7 @@ import shutil
 import pandas as pd
 
 # Read the CSV file
-df = pd.read_csv('/content/Dr_MAML/filelists/ISIC2018/ISIC2018_Task3_Training_GroundTruth.csv')
+df = pd.read_csv('/content/Tra_MAML/filelists/ISIC2018/ISIC2018_Task3_Training_GroundTruth.csv')
 
 # Create the 'ISIC2018' directory
 os.makedirs('/content/ISIC2018', exist_ok=True)
