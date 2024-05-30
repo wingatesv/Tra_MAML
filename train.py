@@ -3,19 +3,14 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torch.optim
-import torch.optim.lr_scheduler as lr_scheduler
 import time
 import os
 import glob
 import math
 import collections
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
-
 
 
 import configs
-from optimizer.ranger21 import Ranger21
 import backbone
 from data.datamgr import SimpleDataManager, SetDataManager
 from methods.baselinetrain import BaselineTrain
@@ -24,10 +19,7 @@ from methods.protonet import ProtoNet
 from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
-from methods.anil import ANIL
-from methods.anneal_maml import ANNEMAML
-from methods.tra_anil import TRA_ANIL
-from methods.xmaml import XMAML
+from methods.tra_maml import TRA_MAML
 import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
@@ -38,17 +30,13 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
           print(f'With scalar Learning rate, Adam LR:{learning_rate}')
           optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
          
-    elif optimization == 'Ranger21':
-          print(f'With scalar Learning rate, Ranger21 LR:{learning_rate}')
-          optimizer = Ranger21(model.parameters(), lr = learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))   
     else:
        raise ValueError('Unknown optimization, please define by yourself')
   
     max_acc = 0   
     total_training_time = 0
     scheduler = None
-    # scheduler = lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=(stop_epoch-start_epoch), eta_min=0.0001)
-
+   
     # Initialize early stopping variables
     patience = int(patience_ratio * (stop_epoch - start_epoch))
     warmup_epochs = int(warmup_epochs_ratio * (stop_epoch - start_epoch))
@@ -56,8 +44,6 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
     
     timestamp_start = time.strftime("%Y%m%d-%H%M%S", time.localtime()) 
     with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
-        if hasattr(model, 'experimental'):
-            log_file.write(f'MAML Experiment: {model.experimental}\n')
         log_file.write(f'Time: {timestamp_start}, Training Start\n')
 
 
@@ -65,7 +51,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
         start_time = time.time() # record start time
         model.train()
         model.train_loop(epoch, base_loader,  optimizer) #model are called by reference, no need to return 
-        # annealing_rate = model.get_annealing_rate()
+
 
         model.eval()
 
@@ -131,18 +117,8 @@ if __name__=='__main__':
     # get the training argument parser
     params = parse_args('train')
 
-
-    #  BreaKHis long tail distribution problem
-    if params.dataset == 'BreaKHis_4x':
-        base_file = configs.data_dir['BreaKHis_4x'] + 'base.json' 
-        val_file   = configs.data_dir['BreaKHis_4x'] + 'val.json' 
-    elif params.dataset == 'BreaKHis_10x':
-        base_file = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-        val_file   = configs.data_dir['BreaKHis_10x'] + 'val.json' 
-    elif params.dataset == 'BreaKHis_20x':
-        base_file = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-        val_file   = configs.data_dir['BreaKHis_20x'] + 'val.json' 
-    elif params.dataset == 'BreaKHis_40x':
+   
+    if params.dataset == 'BreaKHis_40x' or params.dataset == 'cross_IDC':
         base_file = configs.data_dir['BreaKHis_40x'] + 'base.json' 
         val_file   = configs.data_dir['BreaKHis_40x'] + 'val.json' 
     elif params.dataset == 'ISIC':
@@ -151,26 +127,6 @@ if __name__=='__main__':
     elif params.dataset == 'Smear':
         base_file = configs.data_dir['Smear'] + 'base.json' 
         val_file   = configs.data_dir['Smear'] + 'val.json'
-        
-    # different dataset split 
-    elif params.dataset == 'BreaKHis_4x_2':
-        base_file = configs.data_dir['BreaKHis_4x'] + 'base_2.json' 
-        val_file   = configs.data_dir['BreaKHis_4x'] + 'val_2.json' 
-    elif params.dataset == 'BreaKHis_10x_2':
-        base_file = configs.data_dir['BreaKHis_10x'] + 'base_2.json' 
-        val_file   = configs.data_dir['BreaKHis_10x'] + 'val_2.json' 
-    elif params.dataset == 'BreaKHis_20x_2':
-        base_file = configs.data_dir['BreaKHis_20x'] + 'base_2.json' 
-        val_file   = configs.data_dir['BreaKHis_20x'] + 'val_2.json' 
-    elif params.dataset == 'BreaKHis_40x_2' or params.dataset == 'cross_IDC':
-        base_file = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
-        val_file   = configs.data_dir['BreaKHis_40x'] + 'val_2.json' 
-    elif params.dataset == 'ISIC_2':
-        base_file = configs.data_dir['ISIC'] + 'base_2.json' 
-        val_file   = configs.data_dir['ISIC'] + 'val_2.json' 
-    elif params.dataset == 'Smear_2':
-        base_file = configs.data_dir['Smear'] + 'base_2.json' 
-        val_file   = configs.data_dir['Smear'] + 'val_2.json'
 
     else:
         raise ValueError(f"Unsupported dataset: {params.dataset}")
@@ -198,20 +154,19 @@ if __name__=='__main__':
 
     print('Dataset:', params.dataset, 'N-SHOT: ', params.n_shot)
     print(f'Applying {params.train_aug} Data Augmentation ......')
-    print(f'Applying StainNet stain normalization......') if params.sn else print()
     
     if params.method in ['baseline', 'baseline++'] :
       base_datamgr    = SimpleDataManager(image_size, batch_size = 16)
-      base_loader     = base_datamgr.get_data_loader( base_file , aug = params.train_aug, sn = params.sn)
+      base_loader     = base_datamgr.get_data_loader( base_file , aug = params.train_aug)
       val_datamgr     = SimpleDataManager(image_size, batch_size = 64)
-      val_loader      = val_datamgr.get_data_loader( val_file, aug = 'none', sn = params.sn)
+      val_loader      = val_datamgr.get_data_loader( val_file, aug = 'none')
      
       if params.method == 'baseline':
             model           = BaselineTrain( model_dict[params.model], params.num_classes)
       elif params.method == 'baseline++':
             model           = BaselineTrain( model_dict[params.model], params.num_classes, loss_type = 'dist')
 
-    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil']:
+    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'tra_maml']:
        
         n_query = max(1, int(16* params.test_n_way/params.train_n_way)) #if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
 
@@ -219,10 +174,10 @@ if __name__=='__main__':
         test_few_shot_params     = dict(n_way = params.test_n_way, n_support = params.n_shot) 
 
         base_datamgr = SetDataManager(image_size, n_query = n_query,  **train_few_shot_params)
-        base_loader  = base_datamgr.get_data_loader( base_file , aug = params.train_aug,  sn = params.sn)
+        base_loader  = base_datamgr.get_data_loader( base_file , aug = params.train_aug)
         
         val_datamgr = SetDataManager(image_size, n_query = n_query, **test_few_shot_params)
-        val_loader = val_datamgr.get_data_loader( val_file, aug = 'none', sn = params.sn) 
+        val_loader = val_datamgr.get_data_loader( val_file, aug = 'none') 
         #a batch for SetDataManager: a [n_way, n_support + n_query, dim, w, h] tensor  
 
         if params.method == 'protonet':
@@ -241,7 +196,7 @@ if __name__=='__main__':
             model = RelationNet( feature_model, loss_type = loss_type , **train_few_shot_params )
 
 
-        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil']:
+        elif params.method in ['maml' , 'maml_approx', 'tra_maml']:
           backbone.ConvBlock.maml = True
           backbone.SimpleBlock.maml = True
           backbone.BottleneckBlock.maml = True
@@ -250,62 +205,25 @@ if __name__=='__main__':
           if params.method in ['maml', 'maml_approx']:
             model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') , **train_few_shot_params )
        
-          elif params.method == 'anil':
-            model = ANIL(  model_dict[params.model], approx = False , **train_few_shot_params )
 
-          elif params.method == 'annemaml':
-            if params.anneal_param != 'none':
-                anneal_params = params.anneal_param.split('-')
+          elif params.method == 'tra_maml':
+            if params.tra != 'none':
+                tra = params.tra.split('-')
             else:
-                raise ValueError('Unknown Annealing Parameters')
-            model = ANNEMAML(  model_dict[params.model], 
-                             annealing_type = str(anneal_params[0]), 
-                             task_update_num_initial = int(anneal_params[1]), 
-                             task_update_num_final = int(anneal_params[2]), 
-                             annealing_rate = float(anneal_params[3]),
+                raise ValueError('Unknown TRA configs')
+            model = TRA_MAML(  model_dict[params.model], 
+                             task_update_num_initial = int(tra[0]), 
+                             task_update_num_final = int(tra[1]), 
+                             annealing_rate = float(tra[2]),
                              test_mode = False,
                              approx = False, 
                              **train_few_shot_params )
 
-          elif params.method == 'tra_anil':
-            if params.anneal_param != 'none':
-                anneal_params = params.anneal_param.split('-')
-            else:
-                raise ValueError('Unknown Annealing Parameters')
-            model = TRA_ANIL(  model_dict[params.model], 
-                             annealing_type = str(anneal_params[0]), 
-                             task_update_num_initial = int(anneal_params[1]), 
-                             task_update_num_final = int(anneal_params[2]), 
-                             width = float(anneal_params[3]),
-                             test_mode = False,
-                             approx = False, 
-                             **train_few_shot_params )
-              
-          elif params.method == 'xmaml':
-
-            model = XMAML(  model_dict[params.model], 
-                             test_mode = False,
-                             approx = False, 
-                             **train_few_shot_params )
-
+       
               
         else:
           raise ValueError('Unknown method')
 
-
-    # get a batch of images
-    # images, _ = next(iter(base_loader))
-    # print(images.shape)
-
-
-    # # create a grid of images
-    # grid = vutils.make_grid(images, normalize=True)
-
-    # # display the grid of images
-    # plt.imshow(grid.permute(1,2,0))
-    # plt.axis('off')
-    # plt.savefig('image.png')
- 
 
     
     model = model.cuda()
@@ -313,10 +231,9 @@ if __name__=='__main__':
     params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
     if params.train_aug:
         params.checkpoint_dir += f'_{params.train_aug}'
-    if params.sn:
-        params.checkpoint_dir += '_stainnet'
-    if params.anneal_param != 'none':
-        params.checkpoint_dir += f'_{params.anneal_param}'
+   
+    if params.tra != 'none':
+        params.checkpoint_dir += f'_{params.tra}'
     if not params.method  in ['baseline', 'baseline++']: 
         params.checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
 
