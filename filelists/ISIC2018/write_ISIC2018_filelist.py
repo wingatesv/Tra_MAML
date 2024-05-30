@@ -6,7 +6,7 @@ import json
 import random
 
 data_path = '/content/ISIC2018'
-savedir = '/content/Dr_MAML/filelists/ISIC2018/'
+savedir = '/content/Tra_MAML/filelists/ISIC2018/'
 dataset_list = ['base','val','novel']
 
 folder_list = ['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC']
@@ -39,7 +39,7 @@ for dataset in dataset_list:
             file_list += classfile_list
             label_list += np.repeat(i, len(classfile_list)).tolist()
 
-    with open(join(savedir, f"{dataset}_2.json"), "w") as fo:
+    with open(join(savedir, f"{dataset}.json"), "w") as fo:
         json.dump({"label_names": folder_list, "image_names": file_list, "image_labels": label_list}, fo)
 
     print(f"{dataset} - OK")
